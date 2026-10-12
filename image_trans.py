@@ -61,7 +61,7 @@ binary_test_loader = torch.utils.data.DataLoader(
 )
 
 #creating a binary classification model
-device = "cuda" if torch.cuda.is_available else "cpu"
+device = "cpu"
 
 binary_model = nn.Sequential(
     nn.Linear(28*28, 256),
@@ -70,11 +70,36 @@ binary_model = nn.Sequential(
     nn.ReLU(),
     nn.Linear(128,32),
     nn.ReLU(),
-    nn.Linear(32,1),
     nn.Dropout(p=0.25),
-    nn.Sigmoid()).to(device
-)
+    nn.Linear(32,1),
+).to(device)
 
 lr = 0.001
 optimizer = torch.optim.Adam(binary_model.parameters(), lr=lr)
-loss_function = nn.BCELoss()
+loss_fn = nn.BCEWithLogitsLoss()
+
+
+#Training a binary classification model
+for i in range(50):
+    tloss = 0.0
+
+    for imgs, labels in binary_train_loader:
+        imgs = imgs.reshape(-1, 28 * 28).to(device)
+
+        # Class 0 -> label 0; class 9 -> label 1
+        labels = (labels == 9).float().reshape(-1, 1).to(device)
+
+        preds = binary_model(imgs)
+        loss = loss_fn(preds, labels)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        tloss += loss.item()
+
+    # Average loss over all batches
+    tloss /= len(binary_train_loader)
+
+    print(f"Epoch {i + 1}, loss: {tloss:.4f}")
+
