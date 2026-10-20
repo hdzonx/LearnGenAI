@@ -5,6 +5,7 @@ import torch.nn as nn
 import torchvision 
 import torchvision.transforms as T
 import matplotlib.pyplot as plt
+import numpy as np
 
 torch.manual_seed(42)
 transform = T.Compose([T.ToTensor(),
@@ -39,10 +40,12 @@ for i in range(24):
     plt.imshow(img, cmap="binary")
     plt.axis('off')
     plt.title(text_labels[train_set[i][1]],
-fontsize=8)
+fontsize=4)
 plt.show()
 
-
+#Iterates through each item x in the original train_set.
+#If the second element of that item is 0 or 9, it is included
+#in the new binary_train_set.
 binary_train_set = [x for x in train_set if x[1] in [0,9]]
 binary_test_set = [x for x in test_set if x[1] in [0,9]]
 
@@ -80,26 +83,38 @@ loss_fn = nn.BCEWithLogitsLoss()
 
 
 #Training a binary classification model
-for i in range(50):
-    tloss = 0.0
-
-    for imgs, labels in binary_train_loader:
-        imgs = imgs.reshape(-1, 28 * 28).to(device)
-
-        # Class 0 -> label 0; class 9 -> label 1
-        labels = (labels == 9).float().reshape(-1, 1).to(device)
-
-        preds = binary_model(imgs)
-        loss = loss_fn(preds, labels)
-
+for i in range(50):    #A
+    tloss=0
+    for n,(imgs,labels) in enumerate(binary_train_loader):    #B
+        imgs=imgs.reshape(-1,28*28)    #C
+        imgs=imgs.to(device)
+        labels=torch.FloatTensor(\
+          [x if x==0 else 1 for x in labels])    #D
+        labels=labels.reshape(-1,1).to(device)
+        preds=binary_model(imgs)    
+        loss=loss_fn(preds,labels)    #E
         optimizer.zero_grad()
-        loss.backward()
+        loss.backward()    #F
         optimizer.step()
+        tloss+=loss
+    tloss=tloss/n
+    print(f"at epoch {i}, loss is {tloss}")
 
-        tloss += loss.item()
 
-    # Average loss over all batches
-    tloss /= len(binary_train_loader)
+#Calculation the accuracy of predictions
+results =[]
+for imgs, labels in binary_test_loader:
+    imgs = imgs.reshape(-1,28*28).to(device)
+    labels = (labels/9).reshape(-1,1).to(device)
+    preds = binary_model(imgs)
+    pred10 = torch.where(preds>0.5,1,0)
+    correct = (pred10==labels)
+    results.append(correct.detach().cpu()\
+                   .numpy().mean())
 
-    print(f"Epoch {i + 1}, loss: {tloss:.4f}")
+accuracy = np.array(results).mean()               
+print(f"the accuracy of the predictons is {accuracy}")
+
+
+
 
